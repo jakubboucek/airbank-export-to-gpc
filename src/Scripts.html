@@ -1,0 +1,319 @@
+<script>
+  (function(){
+    var GPC_TYPE_REPORT = '074';
+    var GPC_TYPE_ITEM = '075';
+  
+    window.addEventListener( 'load', initApp, false );
+    
+    function initApp() {
+      $('.show-on-load').show();
+      $('#csv-file').on('change', fillAccountNumber);
+      $('#csv-load').on('click', processFile);
+    }
+    
+    function fillAccountNumber(event) {
+      var file = event.target.files[0];
+      if(!file) {
+        return;
+      }
+      var name = file.name;
+      if(!name) {
+        return;
+      }
+      var matches = name.match(/^airbank_(\d{10})_/);
+      if(matches) {
+        $('#account-number').val(matches[1]);
+      }
+      
+    }
+    
+    function processFile() {
+      var accountNumber = $('#account-number').val();
+      
+      loadCsvFile()
+        .then(parseCsv)
+        .then(nameItems)
+        .then((items) => {return generateGpc(items, accountNumber);})
+        .then((gpcFile) => {
+          var fileName = $('#csv-file')[0].files[0].name;
+          fileName = fileName.replace(/\..+$/, '.gpc');
+          prepareFolderSelect();
+          $('#csv-block').slideUp();
+          $('#save-block').slideDown();
+          $('#gpc-save').attr({
+            download: fileName,
+            href: URL.createObjectURL(new Blob([gpcFile], {type: 'application/octet-binary'})),
+            disabled: false,
+          });
+          $('#gpc-upload').on('click', (event) => {
+            uploadFile(gpcFile, fileName);
+          });
+        });
+    }
+    
+    function prepareFolderSelect() {
+      var select = $('#save-folder');
+      if(select.data('isReady')) {
+        return;
+      }
+      $('#csv-upload').prop('disabled', true);
+      google.script.run.withSuccessHandler((folders) => {
+        select.empty();
+        for(var i in folders) {
+          var folder = folders[i];
+          select.append($('<option>', {
+              value: folder.id,
+              text: folder.name,
+              selected: folder.isCurrent
+          }));
+        }
+        select.data('isReady', true);
+        $('#csv-upload').prop('disabled', false);
+      }).getFolders();
+      
+    }
+    
+    function loadCsvFile() {
+      return new Promise((resolve, reject) => {
+        var file = $('#csv-file')[0].files[0];
+        if(typeof file == 'undefined') {
+          reject('Nejdříve vyber soubor');
+        }
+        var reader = new FileReader();
+        
+        reader.onload = function(event) {
+          var content = event.target.result;
+          resolve(content);
+        };
+        
+        reader.readAsText(file);
+      });
+    }
+    
+    function parseCsv(content) {
+      return new Promise((resolve, reject) => {
+        var items = CSVToArray(content, ";");
+        var header = items.shift();
+        
+        if(items.length < 1) {
+          reject('Vstupní soubor neobsahuje žádné položky');
+        }
+        if(items[0].length != 42) {
+          reject('Soubor má jiný formát, asi se nejedná o export plateb z AirBank');
+        }
+                
+        resolve ({
+          header: header,
+          items: items,
+        });
+      });
+    }
+    
+    function nameItems(arrays) {
+      return new Promise((resolve, reject) => {
+        var items = arrays.items;
+        var header = arrays.header;
+        
+        var associativeItems = [];
+        
+        console.log(items);
+        
+        for(var i in items) {
+          var item = items[i];
+          if(item.length == 1) {
+            continue; // Last row may be just trailing spaces
+          }
+          associativeItems.push(
+            nameItem(item)
+          );
+        }
+        
+        resolve ({
+          header: header,
+          items: associativeItems,
+        });
+      });      
+    }
+    
+    function generateGpc(arrays, accountNumber) {
+      return new Promise((resolve, reject) => {
+        var rows = [];
+        var items = arrays.items;
+        for(var i in items) {
+          var item = items[i];
+          rows.push(itemToGpc(item, accountNumber));
+        }
+        resolve(rows.join("\r\n"));
+      });      
+    }
+    
+    function itemToGpc(item, accountNumber) {
+      var parts = [GPC_TYPE_ITEM];
+      
+      var accountParts = undefinedToString(item.offsetAccount).match(/^(?:(\d*)-)?(\d*)?(?:\/(\d*))?/);
+      
+      parts.push(formatGpcNum(accountNumber, 16));
+      parts.push(formatGpcNum(undefinedToString(accountParts[1])+undefinedToString(accountParts[2]), 16));
+      parts.push(formatGpcNum(item.recordNumber, 13));
+      parts.push(formatGpcNum(Math.round(Math.abs(parseCsFloat(item.value)) * 100), 12));
+      parts.push(formatGpcNum(item.code, 1));
+      parts.push(formatGpcNum(item.variableSymbol, 10));
+      parts.push('00');
+      parts.push(formatGpcNum(undefinedToString(accountParts[3]), 4));
+      parts.push(formatGpcNum(item.constantSymbol, 4));
+      parts.push(formatGpcNum(item.specificSymbol, 10));
+      parts.push('000000');
+      parts.push(formatGpcString(item.clientName, 20));
+      parts.push("0");
+      parts.push("0203");
+      parts.push(formatGpcDate(item.dueDate));
+
+      return parts.join('');
+    }
+    
+    function formatGpcNum(num, length) {
+      num = '' + undefinedToString(num);
+      num = num.substring(0, length);
+      return '0'.repeat(length - num.length) + num;
+    }
+    
+    function formatGpcString(value, length) {
+      value = '' + undefinedToString(value);
+      value = value.substring(0, length);
+      return value + ' '.repeat(length - value.length);
+    }
+    
+    function formatGpcDate(date) {
+      var matches = date.match(/(\d{2})\/(\d{2})\/\d{2}(\d{2})/);
+      return matches[1] + matches[2] + matches[3];
+    }
+    
+    function parseCsFloat(num) {
+      return parseFloat(num.replace(',','.'));
+    }
+    
+    // Fix unknown bug of CSV parsing "" as undefined
+    function undefinedToString(value) {
+      if(typeof value == 'undefined') {
+        value = '';
+      }
+      return value;
+    }
+    
+    function nameItem(item) {
+      return {
+        'offsetAccount': item[10],
+        'recordNumber': item[31],
+        'value': item[5],
+        'code': item[5].indexOf('-') === 0 ? '1' : '2',
+        'variableSymbol': item[12],
+        'constantSymbol': item[13],
+        'specificSymbol': item[14],
+        'clientName': item[19],
+        'dueDate': item[0],
+      };
+    }
+    
+    function uploadFile(data, name) {
+      google.script.run
+      .withSuccessHandler((result) => {
+        var url = result.url;
+        var savedName = result.name;
+        var block = $('#report-block').slideDown();
+        var link = $('.gpc-link', block).attr('href', url).text(savedName);
+      })
+      .uploadFileToGoogleDrive(
+         data, 
+         name, 
+         $('#save-folder').val()
+      );
+  };
+    
+  })();
+  
+  /** 
+   * CSVToArray
+   * Credit: Ben Nadel (https://www.bennadel.com/blog/1504-ask-ben-parsing-csv-strings-with-javascript-exec-regular-expression-command.htm) 
+   */
+  function CSVToArray( strData, strDelimiter ){
+    // Check to see if the delimiter is defined. If not,
+    // then default to comma.
+    strDelimiter = (strDelimiter || ",");
+
+    // Create a regular expression to parse the CSV values.
+    var objPattern = new RegExp(
+      (
+        // Delimiters.
+        "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
+
+        // Quoted fields.
+        "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
+
+        // Standard fields.
+        "([^\"\\" + strDelimiter + "\\r\\n]*))"
+      ),
+      "gi"
+      );
+
+
+    // Create an array to hold our data. Give the array
+    // a default empty first row.
+    var arrData = [[]];
+
+    // Create an array to hold our individual pattern
+    // matching groups.
+    var arrMatches = null;
+
+
+    // Keep looping over the regular expression matches
+    // until we can no longer find a match.
+    while (arrMatches = objPattern.exec( strData )){
+
+      // Get the delimiter that was found.
+      var strMatchedDelimiter = arrMatches[ 1 ];
+
+      // Check to see if the given delimiter has a length
+      // (is not the start of string) and if it matches
+      // field delimiter. If id does not, then we know
+      // that this delimiter is a row delimiter.
+      if (
+        strMatchedDelimiter.length &&
+        (strMatchedDelimiter != strDelimiter)
+        ){
+
+        // Since we have reached a new row of data,
+        // add an empty row to our data array.
+        arrData.push( [] );
+
+      }
+
+
+      // Now that we have our delimiter out of the way,
+      // let's check to see which kind of value we
+      // captured (quoted or unquoted).
+      if (arrMatches[ 2 ]){
+
+        // We found a quoted value. When we capture
+        // this value, unescape any double quotes.
+        var strMatchedValue = arrMatches[ 2 ].replace(
+          new RegExp( "\"\"", "g" ),
+          "\""
+          );
+
+      } else {
+
+        // We found a non-quoted value.
+        var strMatchedValue = arrMatches[ 3 ];
+
+      }
+
+
+      // Now that we have our value string, let's add
+      // it to the data array.
+      arrData[ arrData.length - 1 ].push( strMatchedValue );
+    }
+
+    // Return the parsed data.
+    return( arrData );
+  }
+</script>

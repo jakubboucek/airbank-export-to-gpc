@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+	<meta charset="utf-8">
+    <title>Air Bank exports uploader</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <base target="_blank">
+
+	<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<?!= includeHtml('Style'); ?>
+
+	<link href="https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700&subset=latin,latin-ext" rel="stylesheet">
+	<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+	<!--[if lt IE 9]>
+		<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+	<![endif]-->
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4===" crossorigin="anonymous" defer></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous" defer></script>
+	<?!= includeHtml('Scripts'); ?>
+</head>
+<body>
+<div class="container">
+	<div id="wrapper">
+		<header class="clearfix">
+			<div class="row">
+				<div class="col-md-9 col-sm-9">
+					<h3 class="brand"><i class="fa fa-list"></i>Air Bank export uploader</h3>
+				</div>
+				<div class="col-md-3 col-sm-3">
+					<ul class="list-inline text-right">
+						<li></li>
+					</ul>
+				</div>
+			</div>
+		</header>
+		<article>
+			<div class="tab-content-wrapper">
+				<div class="tb-content active" id="home">
+					<div class="box">
+                        <span class="section-icon"><i class="fa fa-cloud-upload fa-2x"></i></span>
+						<h1>CSV</h1>
+						<p>Sem nahraj CSV export pohybů z Air Bank</p>
+					</div>
+					<div class="form-dark hide-on-start show-on-load" id="csv-block">
+                      <div class="form-group">
+                        <label class="sr-only" for="csv-file">Vložte soubor</label>
+                        <div class="input-group">
+                          <div class="input-group-addon"><i class="fa fa-file-excel-o"></i></div>
+                          <input type="file" class="form-control" id="csv-file" placeholder="Air Bank's export CSV">
+                        </div>
+                      </div>
+                      <div class="form-group">
+                        <label class="sr-only" for="account-number">Číslo účtu</label>
+                        <div class="input-group">
+                          <div class="input-group-addon"><i class="fa fa-credit-card"></i></div>
+                          <input type="text" class="form-control" id="account-number" placeholder="Číslo účtu">
+                          <div class="input-group-addon">/3030</div>
+                        </div>
+                      </div>
+                      <button type="submit" class="btn btn-primary" id="csv-load">Zpracovat</button>
+					</div>
+                    <div class="box hide-on-start" id="save-block">
+                      <h4>Uložení GPC</h4>
+                      <p>Vyber složku, kam se soubor uloží</p>
+                      <div class="form-group">
+                        <label class="sr-only" for="save-folder">Složka pro ukládání souboru</label>
+                        <div class="input-group">
+                          <div class="input-group-addon"><i class="fa fa-folder-open"></i></div>
+                          <select class="form-control" id="save-folder" placeholder="Vyber složku">
+                            <option value="">Loading…</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button type="submit" class="btn btn-primary" id="gpc-upload"><i class="fa fa-cloud-upload"></i> Nahrát na Drive</button>
+                      <a href="" class="btn btn-default" id="gpc-save" disabled><i class="fa fa-floppy-o"></i> Stáhnout do PC</a>
+					</div>
+                    <div class="box hide-on-start" id="report-block">
+                      <h4>Uloženo</h4>
+                      <p class="message">Soubor je uložen na Drive jako <a href="" class="gpc-link"></a></p>
+					</div>
+				</div>
+			</div>
+		</article>
+	</div>
+</div>
+</body>
+</html>
