@@ -52,6 +52,7 @@ function uploadFileToGoogleDrive(data, filename, folderId) {
   var folder = DriveApp.getFolderById(folderId);
   
   var file = folder.createFile(filename, data, 'text/plain');
+  setCurrentFolder(folderId);
 
   return {
     id: file.getId(),
